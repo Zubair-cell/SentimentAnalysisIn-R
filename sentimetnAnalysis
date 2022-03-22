@@ -1,0 +1,130 @@
+library(NLP)
+library(tm)
+library(RColorBrewer)
+library(SnowballC)
+library(stringr)
+library(syuzhet)
+reviews <- read.csv(file.choose(),sep =",", header=T)
+
+abc <- as.matrix(reviews)
+head(abc)
+tail(abc)
+
+#text data cleaning 
+#stringr functions for removing symbols
+abc <- str_remove_all(abc,"-")
+abc <- str_remove_all(abc,"’")
+abc <- str_remove_all(abc,"-")
+abc <- str_remove_all(abc,"“")
+abc <- str_remove_all(abc,"”")
+
+#tm fuctions for text cleaning
+abc<-removeNumbers(abc)
+abc<-removePunctuation(abc)
+abc<-tolower(abc)
+abc<-removeWords(abc,c("now","one","will","may","says","said","also","figure","etc","re","can"))
+stopwords<-c("the","and",stopwords("en"))
+abc<-stripWhitespace(abc)
+abc<-wordStem(abc)
+
+#funtion from snowballc
+review_text<-abc
+head(review_text)
+tail(review_text)
+
+#--------------------------------------
+#sentiment analysis
+#sentiment score using get_sintiment() fuctions & scoring method
+#scoring methods: syuzhet, bing, afinn, hrc
+#Each method may have different scale
+syuzhet_score <- get_sentiment(review_text,method = "syuzhet")
+head(syuzhet_score)
+summary(syuzhet_score)
+
+bing_score <- get_sentiment(review_text,method = "bing")
+head(bing_score)
+summary(bing_score)
+
+afinn_score <- get_sentiment(review_text,method = "afinn")
+head(afinn_score)
+summary(afinn_score)
+
+nrc_score <- get_sentiment(review_text,method = "nrc")
+head(nrc_score)
+summary(nrc_score)
+
+comb_score <- cbind(syuzhet_score,bing_score,afinn_score,nrc_score)
+dimnames(comb_score)<- list(1:nrow(comb_score),c("s1","s2","s3","s4"))
+df<- as.data.frame(comb_score)
+head(df,20)
+
+#simple analysis based on syuzhet_score
+min(df$s1)
+minLoc1 <- which(df$s1==min(df$s1))
+minLoc1
+review_text[minLoc1]
+
+max(df$s1)
+maxLoc1 <- which(df$s1==max(df$s1))
+maxLoc1
+review_text[maxLoc1]
+
+#view text docs with extreme negative sentiment score
+
+syuz_neg <- which(syuzhet_score<=(-5))
+txt <- review_text[syuz_neg]
+result <- cbind(syuz_neg,txt)
+result
+
+#view text docs with high positive sentiment score 
+syuz_posit <- which(syuzhet_score>=4.5)
+txt<-review_text[syuz_posit]
+result1 <- cbind(syuz_posit,txt)
+result1
+
+#analysis given above has limitations wrt scale
+#scale used by the txt mining methods differ
+#setniment score normalized with sign function
+#sign function assigns +1 for values >0
+#sign function assign -1 for values < 0
+#sign function assigns 0 for values == 0
+
+norm_score <- cbind(
+  sign(syuzhet_score),
+  sign(bing_score),
+  sign(afinn_score),
+  sign(nrc_score))
+
+dimnames(norm_score)<-list(1:nrow(norm_score),c("x1","x2","x3","x4"))
+head(norm_score)
+
+z <- as.data.frame(norm_score)
+head(z,20)
+
+round(prop.table(table(z$x1)),2) #syuzhet score
+
+#  Emotion classification & positive and negative sentiments
+
+#  "Emotion classification is built on the 
+#  NRC Word-Emotion Association Lexicon (aka EmoLex)"
+
+#  "The NRC Emotion Lexicon is a list of English words and 
+#  their associations with eight basic emotions (anger, fear, 
+#  anticipation, trust, surprise, sadness, joy, and disgust) and 
+#  two sentiments (negative and positive)"
+
+nrc_sentimetn <- get_nrc_sentiment(review_text)
+head(nrc_sentimetn,20)
+tail(nrc_sentimetn,20)
+
+nrc_average <- apply(nrc_sentimetn,2,mean)
+nrc_average
+
+sentisum <- colSums(nrc_sentimetn)
+sentisum
+
+barplot(sentisum[1:19],col = rainbow(10),cex.names = 0.8,cex.axis = 0.8, las=2, main = "Emotions and Sentimetnts")
+lb <- paste(names(sentisum),",", sentisum)
+
+Lb <- paste(names(sentisum),",", sentisum)
+pie(sentisum[1:10],col = brewer.pal(8,"Dark2"),labels = lb , main = " Emotions and sentiments nrc Score",cex=0.8, cex.main=2)
